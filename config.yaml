@@ -24,6 +24,8 @@ lm_pair:
 detectors:
   binoculars: {}             # seuil : lancer `calibrate` après `human`
   fast_detectgpt: {}
+  editlens:                  # Open Pangram : le détecteur local le plus proche de Pangram commercial
+    checkpoint: pangram/editlens_Llama-3.2-3B   # ou pangram/editlens_roberta-large (plus léger)
   hf_classifier:
     enabled: false           # classifieur anglais ; à activer pour des textes en anglais
     model: fakespot-ai/roberta-base-ai-text-detection-v1

@@ -50,3 +50,22 @@ def test_long_text_is_windowed(tiny_pair):
     st = det.pair.stats(text)
     assert len(st.offsets) == len(st.ce) > 32
     assert st.offsets[-1][1] <= len(text)
+
+
+def test_editlens_score_is_expected_bucket():
+    from detbench.detectors.editlens import EditLensDetector
+
+    class Out:
+        logits = torch.tensor([[0.0, 0.0, 10.0]])  # almost all mass on the last bucket
+
+    class FakeModel:
+        device = torch.device("cpu")
+
+        def __call__(self, **kw):
+            return Out()
+
+    det = EditLensDetector.__new__(EditLensDetector)
+    det.tokenizer = lambda text, **kw: {"input_ids": torch.tensor([[1, 2]])}
+    det.model, det.max_length, det.threshold = FakeModel(), 16, 0.5
+    r = det.detect("texte")
+    assert r.ai_probability > 0.99 and r.flagged and r.raw["bucket"] == 2

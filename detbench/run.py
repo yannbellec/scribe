@@ -82,7 +82,7 @@ def cmd_calibrate(cfg, args):
     import numpy as np
     recs = [json.loads(l) for l in (Path(cfg["results_dir"]) / "human.jsonl").open(encoding="utf-8")]
     calib = {}
-    for name, sign in (("binoculars", -1), ("fast_detectgpt", 1)):
+    for name, sign in (("binoculars", -1), ("fast_detectgpt", 1), ("editlens", 1)):
         scores = [r["detectors"][name]["score"] for r in recs if "score" in r["detectors"].get(name, {})]
         if len(scores) < 10:
             print(f"{name} : seulement {len(scores)} textes humains, il en faut au moins 10")

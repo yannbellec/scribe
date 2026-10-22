@@ -14,7 +14,7 @@ données (brief) ─► Claude (claude -p) ─► texte
          condition style_revise : réécriture des 20 % de phrases
          les plus signalées par les détecteurs locaux, avec garde-fou de sens
                      │
-texte ─► détecteurs locaux (Binoculars, Fast-DetectGPT, classifieur HF)
+texte ─► détecteurs locaux (Open Pangram/EditLens, Binoculars, Fast-DetectGPT, classifieur HF)
       ─► juge externe non vu par la boucle (Pangram)
       ─► juge qualité (Claude, à l'aveugle) ─► results/runs.jsonl ─► results/report.md
 ```
@@ -38,6 +38,12 @@ pip install -r requirements.txt
 cp .env.example .env        # y mettre PANGRAM_API_KEY
 claude login                # Claude Code connecté à ton abonnement
 ```
+
+Open Pangram (EditLens) est le détecteur local le plus proche de Pangram commercial
+(F1 0,930 contre 0,992 sur RAID). Ses poids et ceux de la base Llama-3.2-3B sont à accès
+restreint : accepter les deux licences sur Hugging Face (`pangram/editlens_Llama-3.2-3B`,
+`meta-llama/Llama-3.2-3B`) puis lancer `huggingface-cli login`. Licence CC BY-NC-SA 4.0 :
+usage de recherche non commercial uniquement.
 
 Le périphérique est choisi automatiquement : CUDA, sinon MPS (Apple Silicon), sinon CPU.
 Sur Mac, la paire Qwen2.5-7B / Qwen2.5-7B-Instruct tourne en float16 et occupe environ
@@ -80,12 +86,13 @@ python -m detbench.run report
 
 - Les seuils Binoculars publiés ne valent que pour la paire Falcon-7B : toute autre paire
   doit passer par `calibrate`.
-- Le classifieur HF par défaut est entraîné sur de l'anglais.
+- Le classifieur HF par défaut et Open Pangram sont évalués sur de l'anglais.
 - Pangram 4 est mis à jour régulièrement : noter la `version` renvoyée (stockée dans chaque résultat).
 - Turnitin n'est accessible qu'aux établissements ; il n'est pas intégré.
 
 ## Références
 
+- Pangram Labs, *EditLens* / Open Pangram, ICLR 2026 — github.com/pangramlabs/EditLens
 - Hans et al., *Spotting LLMs With Binoculars*, ICML 2024 — github.com/ahans30/Binoculars
 - Bao et al., *Fast-DetectGPT*, ICLR 2024 — github.com/baoguangsheng/fast-detect-gpt
 - Dugan et al., *RAID*, ACL 2024 — github.com/liamdugan/raid

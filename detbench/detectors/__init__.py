@@ -21,6 +21,9 @@ def build_detectors(cfg: dict) -> list[Detector]:
         elif name == "hf_classifier":
             from .hf_classifier import HFClassifierDetector
             out.append(HFClassifierDetector(**opts))
+        elif name == "editlens":
+            from .editlens import EditLensDetector
+            out.append(EditLensDetector(**opts))
         elif name == "pangram":
             from .pangram import PangramDetector
             out.append(PangramDetector(**opts))
