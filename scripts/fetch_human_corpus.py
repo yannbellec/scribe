@@ -105,7 +105,7 @@ def main():
     ap.add_argument("--min-words", type=int, default=200)
     ap.add_argument("--max-words", type=int, default=500)
     ap.add_argument("--fr-split", default="test", choices=("test", "validation", "train"))
-    ap.add_argument("--raid-shards", type=int, default=2,
+    ap.add_argument("--raid-shards", type=int, default=0,
                     help="nombre de fichiers RAID à télécharger (0 = tous)")
     ap.add_argument("--seed", type=int, default=0)
     args = ap.parse_args()
