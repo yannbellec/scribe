@@ -69,3 +69,13 @@ def test_editlens_score_is_expected_bucket():
     det.model, det.max_length, det.threshold = FakeModel(), 16, 0.5
     r = det.detect("texte")
     assert r.ai_probability > 0.99 and r.flagged and r.raw["bucket"] == 2
+
+
+def test_mirror_verification(tmp_path):
+    from detbench.detectors.editlens import ADAPTER_FILE, sha256_file, verify_mirror
+
+    (tmp_path / ADAPTER_FILE).write_bytes(b"weights")
+    good = sha256_file(tmp_path / ADAPTER_FILE)
+    verify_mirror("pangram/x", str(tmp_path), expected=good)
+    with pytest.raises(RuntimeError, match="refusé"):
+        verify_mirror("pangram/x", str(tmp_path), expected="0" * 64)

@@ -43,7 +43,9 @@ Open Pangram (EditLens) est le détecteur local le plus proche de Pangram commer
 (F1 0,930 contre 0,992 sur RAID). Ses poids et ceux de la base Llama-3.2-3B sont à accès
 restreint : accepter les deux licences sur Hugging Face (`pangram/editlens_Llama-3.2-3B`,
 `meta-llama/Llama-3.2-3B`) puis lancer `huggingface-cli login`. Licence CC BY-NC-SA 4.0 :
-usage de recherche non commercial uniquement.
+usage de recherche non commercial uniquement. En attendant la validation de l'accès, `config.yaml`
+charge une copie publique (`mirror`), après avoir vérifié que son empreinte SHA-256 est
+identique à celle que le Hub publie pour le fichier original de Pangram.
 
 Le périphérique est choisi automatiquement : CUDA, sinon MPS (Apple Silicon), sinon CPU.
 Sur Mac, la paire Qwen2.5-7B / Qwen2.5-7B-Instruct tourne en float16 et occupe environ

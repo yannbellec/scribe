@@ -17,6 +17,7 @@ sample is written as one .txt per text in data/human/<lang>/, with manifest.json
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import random
 import re
@@ -125,10 +126,13 @@ def main():
 
         out = ROOT / "data" / "human" / lang
         out.mkdir(parents=True, exist_ok=True)
+        for old in out.glob("*.txt"):  # replace the previous sample entirely
+            old.unlink()
         sample = balanced_sample(df, args.n, args.seed)
         with (out / "manifest.jsonl").open("w", encoding="utf-8") as m:
-            for i, row in enumerate(sample.itertuples()):
-                name = f"{row.source}-{i:05d}.txt"
+            for row in sample.itertuples():
+                # Stable name per source text, so `detbench.run human` never confuses two samples.
+                name = f"{row.source}-{hashlib.sha1(str(row.id).encode()).hexdigest()[:10]}.txt"
                 (out / name).write_text(row.text + "\n", encoding="utf-8")
                 meta = {"file": name, "source": row.source, "id": str(row.id), "domain": row.domain,
                         "title": row.title, "n_words": int(row.n_words)}
