@@ -9,11 +9,14 @@ References
 """
 from __future__ import annotations
 
+import warnings
 from dataclasses import dataclass
 from functools import lru_cache
 
 import torch
 import torch.nn.functional as F
+
+from ..device import best_device
 
 
 @dataclass
@@ -35,15 +38,25 @@ class LMPair:
         self.tokenizer = AutoTokenizer.from_pretrained(observer)
         if self.tokenizer.pad_token is None:
             self.tokenizer.pad_token = self.tokenizer.eos_token
-        kwargs: dict = {"device_map": device_map}
-        if quantization in ("8bit", "4bit"):
-            from transformers import BitsAndBytesConfig
-            kwargs["quantization_config"] = BitsAndBytesConfig(
-                load_in_8bit=quantization == "8bit", load_in_4bit=quantization == "4bit")
-        elif torch.cuda.is_available():
-            kwargs["torch_dtype"] = torch.bfloat16
-        self.observer = AutoModelForCausalLM.from_pretrained(observer, **kwargs).eval()
-        self.performer = AutoModelForCausalLM.from_pretrained(performer, **kwargs).eval()
+        device = best_device()
+        if quantization in ("8bit", "4bit") and device != "cuda":
+            # bitsandbytes needs CUDA; on Apple Silicon / CPU load unquantized instead.
+            warnings.warn(f"Quantification {quantization} ignorée sur {device} (CUDA requis)")
+            quantization = None
+        if device == "cuda":
+            kwargs: dict = {"device_map": device_map}
+            if quantization in ("8bit", "4bit"):
+                from transformers import BitsAndBytesConfig
+                kwargs["quantization_config"] = BitsAndBytesConfig(
+                    load_in_8bit=quantization == "8bit", load_in_4bit=quantization == "4bit")
+            else:
+                kwargs["torch_dtype"] = torch.bfloat16
+            load = lambda name: AutoModelForCausalLM.from_pretrained(name, **kwargs).eval()
+        else:
+            dtype = torch.float16 if device == "mps" else torch.float32
+            load = lambda name: AutoModelForCausalLM.from_pretrained(name, torch_dtype=dtype).to(device).eval()
+        self.observer = load(observer)
+        self.performer = load(performer)
         self.max_tokens = max_tokens
         self._cache: dict[str, TokenStats] = {}
 

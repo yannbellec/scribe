@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import torch
 
+from ..device import best_device
 from .base import DetectionResult, Detector
 
 
@@ -15,8 +16,7 @@ class HFClassifierDetector(Detector):
 
         self.tokenizer = AutoTokenizer.from_pretrained(model)
         self.model = AutoModelForSequenceClassification.from_pretrained(model).eval()
-        if torch.cuda.is_available():
-            self.model.to("cuda")
+        self.model.to(best_device())
         self.name = f"hf:{model.split('/')[-1]}"
         self.threshold = threshold
         self.max_tokens = max_tokens

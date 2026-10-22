@@ -11,12 +11,14 @@ claude:
   model: sonnet              # ou opus
 
 # Paire de modèles partagée par Binoculars et Fast-DetectGPT (chargée une seule fois).
-# Qwen2.5 couvre bien le français. En 8 bits la paire tient dans les 24 Go d'une RTX 4090.
+# Qwen2.5 couvre bien le français. Mac Apple Silicon : float16 sur MPS, ≈ 30 Go de mémoire
+# unifiée pour la paire 7B (prendre Qwen2.5-3B / 3B-Instruct sous 32 Go).
+# GPU NVIDIA : en 8 bits la paire tient dans 24 Go.
 # Pour de l'anglais avec les seuils publiés : tiiuae/falcon-7b + tiiuae/falcon-7b-instruct.
 lm_pair:
   observer: Qwen/Qwen2.5-7B
   performer: Qwen/Qwen2.5-7B-Instruct
-  quantization: 8bit         # 8bit | 4bit | null
+  quantization: 8bit         # 8bit | 4bit | null (ignoré hors CUDA)
   max_tokens: 512
 
 detectors:

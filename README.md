@@ -30,7 +30,7 @@ Trois conditions sont comparées sur les mêmes briefs :
 Le corpus humain (`data/human/`) donne le taux de faux positifs de chaque détecteur
 et sert à caler les seuils locaux à 1 % de faux positifs.
 
-## Installation (machine avec GPU, testé pour une RTX 4090)
+## Installation (Mac Apple Silicon ou GPU NVIDIA)
 
 ```bash
 python -m venv .venv && source .venv/bin/activate
@@ -39,8 +39,11 @@ cp .env.example .env        # y mettre PANGRAM_API_KEY
 claude login                # Claude Code connecté à ton abonnement
 ```
 
-La paire Qwen2.5-7B / Qwen2.5-7B-Instruct en 8 bits occupe environ 16 Go de VRAM.
-Les deux détecteurs locaux la partagent, elle n'est chargée qu'une fois.
+Le périphérique est choisi automatiquement : CUDA, sinon MPS (Apple Silicon), sinon CPU.
+Sur Mac, la paire Qwen2.5-7B / Qwen2.5-7B-Instruct tourne en float16 et occupe environ
+30 Go de mémoire unifiée ; sous 32 Go, utiliser la paire Qwen2.5-3B. Sur GPU NVIDIA,
+la quantification 8 bits la ramène à environ 16 Go. Les deux détecteurs locaux
+partagent cette paire, elle n'est chargée qu'une fois.
 
 ## Utilisation
 
