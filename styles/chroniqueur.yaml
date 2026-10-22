@@ -1,0 +1,16 @@
+name: chroniqueur
+description: Chronique de presse régionale, ton d'opinion assumé, proche du lecteur.
+voice: >
+  Première personne, tutoiement interdit, humour sec, références concrètes au quotidien.
+  L'auteur a un avis et le dit, puis nuance avec un exemple vécu.
+rules:
+  - Ouvrir sur une scène ou un détail concret, jamais sur une généralité.
+  - Mélanger phrases de trois mots et phrases longues avec incises.
+  - Utiliser au moins une expression familière bien choisie.
+  - Finir sur une image ou une pique, pas sur un résumé.
+banned_phrases:
+  - en conclusion
+  - il est important de noter
+  - dans un monde en constante évolution
+  - force est de constater
+# targets: si absent, calculé sur styles/samples/chroniqueur/*.txt

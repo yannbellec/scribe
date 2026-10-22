@@ -1,0 +1,38 @@
+# Chemins
+styles_dir: styles
+briefs_dir: data/briefs
+human_dir: data/human        # vrais textes humains : mesure des faux positifs + calibration
+results_dir: results
+target_fpr: 0.01             # seuils locaux calés pour 1 % de faux positifs sur le corpus humain
+
+# Claude Code en mode headless sur l'abonnement Max (backend: api pour une clé ANTHROPIC_API_KEY)
+claude:
+  backend: cli
+  model: sonnet              # ou opus
+
+# Paire de modèles partagée par Binoculars et Fast-DetectGPT (chargée une seule fois).
+# Qwen2.5 couvre bien le français. En 8 bits la paire tient dans les 24 Go d'une RTX 4090.
+# Pour de l'anglais avec les seuils publiés : tiiuae/falcon-7b + tiiuae/falcon-7b-instruct.
+lm_pair:
+  observer: Qwen/Qwen2.5-7B
+  performer: Qwen/Qwen2.5-7B-Instruct
+  quantization: 8bit         # 8bit | 4bit | null
+  max_tokens: 512
+
+detectors:
+  binoculars: {}             # seuil : lancer `calibrate` après `human`
+  fast_detectgpt: {}
+  hf_classifier:
+    enabled: false           # classifieur anglais ; à activer pour des textes en anglais
+    model: fakespot-ai/roberta-base-ai-text-detection-v1
+  pangram:
+    daily_word_budget: 2000  # quota gratuit
+
+# Détecteurs appelés une seule fois en fin de génération (juges non vus par la boucle)
+external_detectors: [pangram]
+
+# Boucle de révision (condition style_revise)
+revision:
+  max_rounds: 3
+  fraction: 0.2              # part des phrases réécrites à chaque tour
+  min_similarity: 0.88       # garde-fou de sens (embeddings E5) ; null pour désactiver
