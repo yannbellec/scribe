@@ -11,7 +11,7 @@ The full filtered pool is kept in data/corpora/<lang>.parquet; a balanced random
 sample is written as one .txt per text in data/human/<lang>/, with manifest.jsonl.
 
     python scripts/fetch_human_corpus.py                    # 500 fr + 500 en
-    python scripts/fetch_human_corpus.py --lang en --n 2000
+    python scripts/fetch_human_corpus.py --lang en --n 2000 --raid-shards 0   # all RAID shards
     python scripts/fetch_human_corpus.py --fr-split train   # whole MLSUM train pool (~390k)
 """
 from __future__ import annotations
@@ -43,30 +43,44 @@ def truncate(text: str, max_words: int) -> str:
     return " ".join(out)
 
 
-def query(sql: str):
+def parquet_files(repo: str, prefix: str, limit: int | None = None) -> list[str]:
+    """Download the auto-converted Parquet shards of a Hub dataset into the local HF cache.
+
+    hf_hub_download resumes, retries on HTTP 429 and uses the saved `huggingface-cli login`
+    token, unlike reading hf:// URLs directly (which hit Hub rate limits).
+    """
+    from huggingface_hub import HfApi, hf_hub_download
+
+    files = sorted(f for f in HfApi().list_repo_files(repo, repo_type="dataset", revision="refs/convert/parquet")
+                   if f.startswith(prefix) and f.endswith(".parquet"))
+    files = files[:limit] if limit else files
+    paths = []
+    for i, f in enumerate(files, 1):
+        print(f"  {repo} {f} ({i}/{len(files)})", flush=True)
+        paths.append(hf_hub_download(repo, f, repo_type="dataset", revision="refs/convert/parquet"))
+    return paths
+
+
+def query(sql: str, paths: list[str]):
     import duckdb
 
-    con = duckdb.connect()
-    con.execute("INSTALL httpfs; LOAD httpfs;")
-    return con.execute(sql).fetch_df()
+    listing = ", ".join(f"'{p}'" for p in paths)
+    return duckdb.connect().execute(sql.replace("{files}", f"read_parquet([{listing}])")).fetch_df()
 
 
 def fetch_fr(split: str):
-    df = query(f"""
-        SELECT url AS id, date, topic AS domain, title, text
-        FROM 'hf://datasets/reciTAL/mlsum@~parquet/fr/{split}/*.parquet'
-    """)
+    df = query("SELECT url AS id, date, topic AS domain, title, text FROM {files}",
+               parquet_files("reciTAL/mlsum", f"fr/{split}/"))
     df["source"] = "mlsum-fr"
     return df
 
 
-def fetch_en():
+def fetch_en(shards: int | None):
     domains = ", ".join(f"'{d}'" for d in RAID_DOMAINS)
     df = query(f"""
-        SELECT id, domain, title, generation AS text
-        FROM 'hf://datasets/liamdugan/raid@~parquet/raid/partial-train/*.parquet'
+        SELECT id, domain, title, generation AS text FROM {{files}}
         WHERE model = 'human' AND attack = 'none' AND domain IN ({domains})
-    """)
+    """, parquet_files("liamdugan/raid", "raid/partial-train/", shards))
     df = df.drop_duplicates("id")
     df["source"] = "raid"
     return df
@@ -91,12 +105,14 @@ def main():
     ap.add_argument("--min-words", type=int, default=200)
     ap.add_argument("--max-words", type=int, default=500)
     ap.add_argument("--fr-split", default="test", choices=("test", "validation", "train"))
+    ap.add_argument("--raid-shards", type=int, default=2,
+                    help="nombre de fichiers RAID à télécharger (0 = tous)")
     ap.add_argument("--seed", type=int, default=0)
     args = ap.parse_args()
 
     for lang in args.lang:
         print(f"[{lang}] téléchargement…", flush=True)
-        df = fetch_fr(args.fr_split) if lang == "fr" else fetch_en()
+        df = fetch_fr(args.fr_split) if lang == "fr" else fetch_en(args.raid_shards or None)
         df["text"] = df["text"].astype(str).str.replace(r"\s+", " ", regex=True).str.strip()
         df["text"] = [truncate(t, args.max_words) for t in df["text"]]
         df["n_words"] = df["text"].str.count(r"\w+")
