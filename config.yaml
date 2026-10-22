@@ -1,9 +1,9 @@
 # Chemins
 styles_dir: styles
 briefs_dir: data/briefs
-human_dir: data/human        # vrais textes humains : mesure des faux positifs + calibration
+human_dir: data/human        # data/human/<fr|en>/*.txt : faux positifs + calibration par langue
 results_dir: results
-target_fpr: 0.01             # seuils locaux calés pour 1 % de faux positifs sur le corpus humain
+target_fpr: 0.01             # seuils locaux calés par langue pour 1 % de faux positifs
 
 # Claude Code en mode headless sur l'abonnement Max (backend: api pour une clé ANTHROPIC_API_KEY)
 claude:
@@ -30,7 +30,8 @@ detectors:
     enabled: false           # classifieur anglais ; à activer pour des textes en anglais
     model: fakespot-ai/roberta-base-ai-text-detection-v1
   pangram:
-    daily_word_budget: 2000  # quota gratuit
+    enabled: false           # l'API demande un compte payant ; vérifier les textes finaux sur pangram.com
+    daily_word_budget: 2000
 
 # Détecteurs appelés une seule fois en fin de génération (juges non vus par la boucle)
 external_detectors: [pangram]

@@ -36,8 +36,12 @@ def test_styles_and_briefs_load():
     assert {"chroniqueur", "technicien", "conteur"} <= set(styles)
     prompt = styles["technicien"].system_prompt()
     assert "technicien" in prompt and "de plus" in prompt
+    assert "anglais" in styles["technicien"].system_prompt("en")
     briefs = load_briefs(ROOT / "data" / "briefs")
     assert any("300 vélos" in f for b in briefs for f in b.facts)
+    en = next(b for b in briefs if b.language == "en")
+    assert en.prompt().startswith("Write a") and "English" in en.prompt()
+    assert next(b for b in briefs if b.language == "fr").prompt().startswith("Écris")
 
 
 class FakeDetector(Detector):
@@ -93,8 +97,9 @@ def test_report(tmp_path):
         {"kind": "human", "condition": "humain", "style": "corpus",
          "detectors": {"fake": {"p_ai": 0.1, "flagged": False}}}))
     md = build_report(tmp_path).read_text()
-    assert "| raw | — | 2 | 100 % |" in md
-    assert "| raw | 1.00 |" in md
+    assert "| fr | raw | — | 2 | 100 % |" in md
+    assert "| fr | humain | corpus | 1 | 0 % |" in md
+    assert "| fr | raw | 1.00 |" in md
 
 
 def test_pangram_parsing(tmp_path, monkeypatch):
@@ -145,3 +150,42 @@ def test_revise_keeps_going_while_a_document_level_detector_flags():
     text = "Une phrase vive. Une phrase plate. Encore une vive."
     _, trace = revise(text, FakeLLM(), style, [FakeDetector(), DocOnly()], max_rounds=5)
     assert trace.rounds[-1]["flagged"] == [] and len(trace.rounds) == 3
+
+
+def test_style_samples_are_per_language(tmp_path):
+    (tmp_path / "s.yaml").write_text("name: s\n", encoding="utf-8")
+    for lang, text in (("fr", "Une phrase. Une autre phrase bien plus longue que la première."),
+                       ("en", "One. Two words.")):
+        d = tmp_path / "samples" / "s" / lang
+        d.mkdir(parents=True)
+        (d / "a.txt").write_text(text, encoding="utf-8")
+    style = load_styles(tmp_path)["s"]
+    assert set(style.samples) == {"fr", "en"}
+    assert "Une autre phrase" in style.system_prompt("fr") and "Two words" not in style.system_prompt("fr")
+    assert style.targets["en"]["sent_len_mean"] == 1.5
+
+
+def test_build_detectors_skips_failures():
+    from detbench.detectors import build_detectors
+
+    cfg = {"detectors": {"pangram": {"api_key": "k", "cache_dir": "/nonexistent/\0bad"},
+                         "unknown": {}}}
+    with pytest.raises(RuntimeError, match="Aucun détecteur"):
+        with pytest.warns(UserWarning):
+            build_detectors(cfg)
+
+
+def test_calibration_is_per_language(tmp_path):
+    from types import SimpleNamespace
+
+    from detbench.run import apply_thresholds, cmd_calibrate
+
+    recs = [{"language": lang, "detectors": {"fast_detectgpt": {"score": float(i) + off}}}
+            for lang, off in (("fr", 0.0), ("en", 100.0)) for i in range(20)]
+    (tmp_path / "human.jsonl").write_text("\n".join(json.dumps(r) for r in recs))
+    cmd_calibrate({"results_dir": str(tmp_path), "target_fpr": 0.05}, None)
+    calib = json.loads((tmp_path / "calibration.json").read_text())
+    assert calib["fr"]["fast_detectgpt"] < 20 < calib["en"]["fast_detectgpt"]
+    det = SimpleNamespace(name="fast_detectgpt", threshold=0)
+    apply_thresholds([det], calib, "en")
+    assert det.threshold == calib["en"]["fast_detectgpt"]

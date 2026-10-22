@@ -53,13 +53,18 @@ partagent cette paire, elle n'est chargée qu'une fois.
 
 ## Utilisation
 
+Tout fonctionne en français et en anglais : chaque brief a un champ `language` (`fr` ou `en`),
+les extraits de style sont rangés par langue et les seuils sont calés séparément pour chaque langue.
+
 ```bash
-# 1. Corpus humain → faux positifs, puis seuils calés à 1 % de FPR
+# 1. Corpus humain (MLSUM fr + RAID en) → faux positifs, puis seuils calés à 1 % de FPR par langue
+python scripts/fetch_human_corpus.py
 python -m detbench.run human
 python -m detbench.run calibrate
 
 # 2. Génération + mesures (petit essai d'abord, sans Pangram ni juge)
 python -m detbench.run generate --brief velo-partage --style technicien --no-external --no-judge
+python -m detbench.run generate --lang en --condition raw style --repeats 3
 
 # 3. Campagne complète
 python -m detbench.run generate --repeats 3
@@ -71,7 +76,7 @@ python -m detbench.run report
 ## Ajouter un style
 
 1. Créer `styles/<nom>.yaml` (voir `styles/technicien.yaml`).
-2. Déposer 5 à 15 extraits humains dans `styles/samples/<nom>/*.txt`.
+2. Déposer 5 à 15 extraits humains dans `styles/samples/<nom>/fr/*.txt` et `…/en/*.txt`.
    Les repères chiffrés (longueur et variance des phrases…) sont calculés dessus.
 
 ## Coûts
@@ -89,6 +94,13 @@ python -m detbench.run report
 - Le classifieur HF par défaut et Open Pangram sont évalués sur de l'anglais.
 - Pangram 4 est mis à jour régulièrement : noter la `version` renvoyée (stockée dans chaque résultat).
 - Turnitin n'est accessible qu'aux établissements ; il n'est pas intégré.
+
+## Corpus humains
+
+| Langue | Source | Contenu | Licence |
+|---|---|---|---|
+| fr | MLSUM (Scialom et al., EMNLP 2020) | ≈ 425 000 articles du *Monde*, 2010-2019 | recherche non commerciale |
+| en | RAID, split humain (Dugan et al., ACL 2024) | presse, Reddit, avis, Wikipédia, résumés scientifiques, livres | MIT |
 
 ## Références
 

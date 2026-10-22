@@ -37,18 +37,18 @@ def build_report(results_dir: Path) -> Path:
 
     groups = defaultdict(list)
     for r in runs:
-        groups[(r["condition"], r["style"] or "—")].append(r)
-    if human:
-        groups[("humain", "corpus")] = human
+        groups[(r.get("language", "fr"), r["condition"], r["style"] or "—")].append(r)
+    for r in human:
+        groups[(r.get("language", "fr"), "humain", "corpus")].append(r)
 
     lines = ["# Résultats du banc d'essai", "",
              f"{len(runs)} textes générés, {len(human)} textes humains.", "",
              "## Taux de signalement par détecteur", "",
              "Part des textes que chaque détecteur classe IA à son seuil. Sur la ligne « humain », "
              "c'est le taux de faux positifs.", "",
-             "| " + " | ".join(["Condition", "Style", "n", *detectors, "Faits", "Clarté", "Naturel"]) + " |",
-             "|" + "---|" * (6 + len(detectors))]
-    for (cond, style), recs in sorted(groups.items()):
+             "| " + " | ".join(["Langue", "Condition", "Style", "n", *detectors, "Faits", "Clarté", "Naturel"]) + " |",
+             "|" + "---|" * (7 + len(detectors))]
+    for (lang, cond, style), recs in sorted(groups.items()):
         cells = []
         for d in detectors:
             vals = [r["detectors"][d]["flagged"] for r in recs if "flagged" in r["detectors"].get(d, {})]
@@ -56,20 +56,22 @@ def build_report(results_dir: Path) -> Path:
         q = [r.get("quality") or {} for r in recs]
         quality = [_fmt(_mean([x.get("fact_recall") for x in q]), pct=True),
                    _fmt(_mean([x.get("clarte") for x in q])), _fmt(_mean([x.get("naturel") for x in q]))]
-        lines.append("| " + " | ".join([cond, style, str(len(recs)), *cells, *quality]) + " |")
+        lines.append("| " + " | ".join([lang, cond, style, str(len(recs)), *cells, *quality]) + " |")
 
     if human:
         lines += ["", "## Séparabilité humain / IA (AUROC)", "",
                   "0,5 = le détecteur ne distingue plus les textes de la condition des textes humains.", "",
-                  "| Condition | " + " | ".join(detectors) + " |", "|---|" + "---|" * len(detectors)]
-        for cond in sorted({r["condition"] for r in runs}):
+                  "| Langue | Condition | " + " | ".join(detectors) + " |", "|---|---|" + "---|" * len(detectors)]
+        lang_of = lambda r: r.get("language", "fr")
+        for lang, cond in sorted({(lang_of(r), r["condition"]) for r in runs}):
             cells = []
             for d in detectors:
                 pos = [r["detectors"][d]["p_ai"] for r in runs
-                       if r["condition"] == cond and "p_ai" in r["detectors"].get(d, {})]
-                neg = [r["detectors"][d]["p_ai"] for r in human if "p_ai" in r["detectors"].get(d, {})]
+                       if lang_of(r) == lang and r["condition"] == cond and "p_ai" in r["detectors"].get(d, {})]
+                neg = [r["detectors"][d]["p_ai"] for r in human
+                       if lang_of(r) == lang and "p_ai" in r["detectors"].get(d, {})]
                 cells.append(_fmt(_auroc(pos, neg)))
-            lines.append(f"| {cond} | " + " | ".join(cells) + " |")
+            lines.append(f"| {lang} | {cond} | " + " | ".join(cells) + " |")
 
     revs = [r for r in runs if r.get("revision")]
     if revs:

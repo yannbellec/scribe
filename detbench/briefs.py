@@ -20,7 +20,11 @@ class Brief:
 
     def prompt(self) -> str:
         facts = "\n".join(f"- {f}" for f in self.facts)
-        return (f"Écris un {self.genre} d'environ {self.length_words} mots en {self.language} "
+        if self.language == "en":
+            return (f"Write a {self.genre} of about {self.length_words} words in English "
+                    f"about: {self.subject}.\nAudience: {self.audience}.\n"
+                    f"Include all of these facts faithfully, and invent no others:\n{facts}")
+        return (f"Écris un {self.genre} d'environ {self.length_words} mots en français "
                 f"sur : {self.subject}.\nPublic : {self.audience}.\n"
                 f"Données à intégrer fidèlement (toutes, sans en inventer d'autres) :\n{facts}")
 

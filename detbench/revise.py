@@ -41,7 +41,8 @@ def rank_sentences(text: str, results: list[DetectionResult]) -> list[tuple[floa
     return sorted(ranked, key=lambda x: -x[0])
 
 
-def _rewrite(llm: Claude, style: Style, text: str, targets: list[tuple[float, str, int, int]]) -> str:
+def _rewrite(llm: Claude, style: Style, text: str, targets: list[tuple[float, str, int, int]],
+             language: str = "fr") -> str:
     listing = "\n".join(f'{i}. "{t[1]}"' for i, t in enumerate(targets, 1))
     prompt = (
         f"Voici un texte :\n<texte>\n{text}\n</texte>\n\n"
@@ -49,8 +50,9 @@ def _rewrite(llm: Claude, style: Style, text: str, targets: list[tuple[float, st
         f"rythme moins régulier, mots plus concrets, formulations moins attendues. Garde exactement les mêmes "
         f"informations et la cohérence avec les phrases voisines. Tu peux fusionner ou couper une phrase.\n"
         f"{listing}\n\n"
-        'Réponds en JSON : {"1": "nouvelle phrase", "2": "..."}')
-    out = llm.complete_json(prompt, style.system_prompt())
+        + ("Les nouvelles phrases restent en anglais, comme le texte.\n" if language == "en" else "")
+        + 'Réponds en JSON : {"1": "nouvelle phrase", "2": "..."}')
+    out = llm.complete_json(prompt, style.system_prompt(language))
     new_text = text
     # Replace from the end so earlier offsets stay valid.
     for i, (_, sent, a, b) in sorted(enumerate(targets, 1), key=lambda x: -x[1][2]):
@@ -61,7 +63,8 @@ def _rewrite(llm: Claude, style: Style, text: str, targets: list[tuple[float, st
 
 
 def revise(text: str, llm: Claude, style: Style, detectors: list[Detector], max_rounds: int = 3,
-           fraction: float = 0.2, min_similarity: float = 0.88, similarity_fn=None) -> tuple[str, RevisionTrace]:
+           fraction: float = 0.2, min_similarity: float = 0.88, similarity_fn=None,
+           language: str = "fr") -> tuple[str, RevisionTrace]:
     trace = RevisionTrace()
     original = text
     # Every local detector decides when to stop; only those with sentence scores
@@ -75,7 +78,7 @@ def revise(text: str, llm: Claude, style: Style, detectors: list[Detector], max_
             break
         ranked = rank_sentences(text, results)
         k = max(1, round(len(ranked) * fraction))
-        candidate = _rewrite(llm, style, text, ranked[:k])
+        candidate = _rewrite(llm, style, text, ranked[:k], language)
         if similarity_fn is not None:
             sim = similarity_fn(original, candidate)
             entry["similarity_after"] = round(sim, 4)
