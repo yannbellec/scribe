@@ -64,9 +64,10 @@ def revise(text: str, llm: Claude, style: Style, detectors: list[Detector], max_
            fraction: float = 0.2, min_similarity: float = 0.88, similarity_fn=None) -> tuple[str, RevisionTrace]:
     trace = RevisionTrace()
     original = text
-    local = [d for d in detectors if d.supports_sentences]
+    # Every local detector decides when to stop; only those with sentence scores
+    # (Binoculars, Fast-DetectGPT) choose which sentences to rewrite.
     for rnd in range(max_rounds + 1):
-        results = [d.detect(text) for d in local]
+        results = [d.detect(text) for d in detectors]
         entry = {"round": rnd, "scores": {r.detector: round(r.ai_probability, 4) for r in results},
                  "flagged": [r.detector for r in results if r.flagged]}
         trace.rounds.append(entry)

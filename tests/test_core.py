@@ -130,3 +130,18 @@ def test_pangram_parsing(tmp_path, monkeypatch):
     assert len(calls) == 1
     with pytest.raises(RuntimeError, match="Budget"):
         det.detect("un texte qui dépasse le budget")
+
+
+def test_revise_keeps_going_while_a_document_level_detector_flags():
+    class DocOnly(Detector):
+        name = "doc"
+        calls = 0
+
+        def detect(self, text):
+            DocOnly.calls += 1
+            return DetectionResult(self.name, 0.9, DocOnly.calls < 3, {})
+
+    style = load_styles(ROOT / "styles")["technicien"]
+    text = "Une phrase vive. Une phrase plate. Encore une vive."
+    _, trace = revise(text, FakeLLM(), style, [FakeDetector(), DocOnly()], max_rounds=5)
+    assert trace.rounds[-1]["flagged"] == [] and len(trace.rounds) == 3
