@@ -1,0 +1,7 @@
+.env
+results/
+__pycache__/
+*.pyc
+.venv/
+data/corpora/
+data/human/*/

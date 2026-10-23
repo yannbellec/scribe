@@ -1,0 +1,11 @@
+subject: an internal write-up of an email outage at a small company
+genre: incident report
+audience: the company's staff
+length_words: 350
+language: en
+facts:
+  - outage lasted 3 h 40 on Tuesday morning, from 8:10 to 11:50
+  - cause was an expired TLS certificate on the mail server
+  - about 1,200 emails were delayed, none lost
+  - the renewal alert was going to a deleted mailbox
+  - fix - automatic renewal, and alerts now go to two people

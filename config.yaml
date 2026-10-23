@@ -1,0 +1,48 @@
+# Chemins
+styles_dir: styles
+briefs_dir: data/briefs
+human_dir: data/human        # data/human/<fr|en>/*.txt : faux positifs + calibration par langue
+results_dir: results
+target_fpr: 0.01             # seuils locaux calés par langue pour 1 % de faux positifs
+
+# Claude Code en mode headless sur l'abonnement Max (backend: api pour une clé ANTHROPIC_API_KEY)
+claude:
+  backend: cli
+  model: sonnet              # ou opus
+
+# Paire de modèles partagée par Binoculars et Fast-DetectGPT (chargée une seule fois).
+# Qwen2.5 couvre bien le français. Mac Apple Silicon : float16 sur MPS, ≈ 30 Go de mémoire
+# unifiée pour la paire 7B (prendre Qwen2.5-3B / 3B-Instruct sous 32 Go).
+# GPU NVIDIA : en 8 bits la paire tient dans 24 Go.
+# Pour de l'anglais avec les seuils publiés : tiiuae/falcon-7b + tiiuae/falcon-7b-instruct.
+lm_pair:
+  observer: Qwen/Qwen2.5-7B
+  performer: Qwen/Qwen2.5-7B-Instruct
+  quantization: 8bit         # 8bit | 4bit | null (ignoré hors CUDA)
+  max_tokens: 512
+
+detectors:
+  binoculars: {}             # seuil : lancer `calibrate` après `human`
+  fast_detectgpt: {}
+  editlens:                  # Open Pangram : le détecteur local le plus proche de Pangram commercial
+    checkpoint: pangram/editlens_Llama-3.2-3B   # ou pangram/editlens_roberta-large (plus léger)
+    # Copie publique (redistribution CC BY-NC-SA, usage NON COMMERCIAL), utilisée tant que l'accès
+    # à l'original est en attente. Refusée si son empreinte SHA-256 diffère de l'original.
+    mirror: ml-resources/editlens_Llama-3.2-3B
+  hf_classifier:
+    enabled: false           # classifieur anglais ; à activer pour des textes en anglais
+    model: fakespot-ai/roberta-base-ai-text-detection-v1
+  pangram:
+    enabled: false           # l'API demande un compte payant ; vérifier les textes finaux sur pangram.com
+    daily_word_budget: 2000
+
+# Juges tenus à l'écart de la boucle de révision : notés une seule fois sur le texte final,
+# ils mesurent si ce qui trompe les détecteurs locaux trompe aussi un détecteur jamais vu.
+# --no-external ne coupe que les API payantes (pangram).
+external_detectors: [pangram, editlens]
+
+# Boucle de révision (condition style_revise)
+revision:
+  max_rounds: 3
+  fraction: 0.2              # part des phrases réécrites à chaque tour
+  min_similarity: 0.88       # garde-fou de sens (embeddings E5) ; null pour désactiver

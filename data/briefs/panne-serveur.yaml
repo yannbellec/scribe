@@ -1,0 +1,10 @@
+subject: le compte rendu d'une panne de messagerie dans une PME
+genre: compte rendu interne
+audience: les salariés de l'entreprise
+length_words: 350
+facts:
+  - panne de 3 h 40, le mardi matin, de 8 h 10 à 11 h 50
+  - cause : certificat TLS expiré sur le serveur de messagerie
+  - environ 1 200 courriels retardés, aucun perdu
+  - l'alerte de renouvellement partait vers une adresse supprimée
+  - correctif : renouvellement automatique et alerte envoyée à deux personnes
