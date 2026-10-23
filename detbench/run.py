@@ -165,6 +165,25 @@ def cmd_generate(cfg, args):
                           {k: v.get("p_ai") for k, v in rec["detectors"].items()})
 
 
+def cmd_rescore(cfg, args):
+    """Add detectors to texts already scored (human.jsonl and runs.jsonl), without regenerating."""
+    sub = {**cfg, "detectors": {k: v for k, v in cfg["detectors"].items() if k in args.detectors}}
+    detectors = build_detectors(sub)
+    for name in ("human.jsonl", "runs.jsonl"):
+        path = Path(cfg["results_dir"]) / name
+        if not path.exists():
+            continue
+        recs = [json.loads(l) for l in path.open(encoding="utf-8") if l.strip()]
+        todo = [r for r in recs if any("score" not in r["detectors"].get(d.name, {}) for d in detectors)]
+        for i, r in enumerate(todo, 1):
+            r["detectors"].update(_score(detectors, r["text"]))
+            if i % 50 == 0 or i == len(todo):
+                print(f"{name} : {i}/{len(todo)}")
+                tmp = path.with_suffix(".tmp")  # checkpoint: an interrupted run resumes where it stopped
+                tmp.write_text("".join(json.dumps(x, ensure_ascii=False) + "\n" for x in recs), encoding="utf-8")
+                tmp.replace(path)
+
+
 def cmd_report(cfg, args):
     from .report import build_report
     path = build_report(Path(cfg["results_dir"]))
@@ -188,12 +207,15 @@ def main():
     g.add_argument("--repeats", type=int, default=1)
     g.add_argument("--no-external", action="store_true", help="ne pas appeler Pangram")
     g.add_argument("--no-judge", action="store_true", help="ne pas noter la qualité")
+    rs = sub.add_parser("rescore")
+    rs.add_argument("--detectors", nargs="+", required=True, help="détecteurs à ajouter, ex. editlens")
     sub.add_parser("report")
     args = ap.parse_args()
     load_env()
     cfg = load_config(args.config)
     Path(cfg["results_dir"]).mkdir(parents=True, exist_ok=True)
-    {"human": cmd_human, "calibrate": cmd_calibrate, "generate": cmd_generate, "report": cmd_report}[args.cmd](cfg, args)
+    {"human": cmd_human, "calibrate": cmd_calibrate, "generate": cmd_generate,
+     "rescore": cmd_rescore, "report": cmd_report}[args.cmd](cfg, args)
 
 
 if __name__ == "__main__":
