@@ -79,3 +79,16 @@ def test_mirror_verification(tmp_path):
     verify_mirror("pangram/x", str(tmp_path), expected=good)
     with pytest.raises(RuntimeError, match="refusé"):
         verify_mirror("pangram/x", str(tmp_path), expected="0" * 64)
+
+
+def test_editlens_reads_normed_head(tmp_path):
+    from safetensors.torch import save_file
+
+    from detbench.detectors.editlens import EditLensDetector, NormedLinear, clean_text
+
+    path = tmp_path / "adapter_model.safetensors"
+    save_file({"base_model.model.score.modules_to_save.default.linear.weight": torch.zeros(7, 8),
+               "base_model.model.score.modules_to_save.default.norm.weight": torch.ones(8)}, str(path))
+    assert EditLensDetector._num_buckets(path) == 7
+    assert NormedLinear(8, 7)(torch.zeros(2, 8)).shape == (2, 7)
+    assert clean_text("<think>x</think> Hello\n\n World ") == "hello world"

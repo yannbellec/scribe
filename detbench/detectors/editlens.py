@@ -13,6 +13,7 @@ is readable even while access to the original is pending.
 from __future__ import annotations
 
 import hashlib
+import re
 from pathlib import Path
 
 import torch
@@ -27,6 +28,25 @@ BASES = {
 
 
 ADAPTER_FILE = "adapter_model.safetensors"
+
+
+class NormedLinear(torch.nn.Module):
+    """Classification head used by EditLens LoRA checkpoints (scripts/train.py upstream)."""
+
+    def __init__(self, hidden_size, num_labels, device=None, dtype=None):
+        super().__init__()
+        self.norm = torch.nn.LayerNorm(hidden_size, device=device, dtype=dtype)
+        self.linear = torch.nn.Linear(hidden_size, num_labels, bias=False, device=device, dtype=dtype)
+
+    def forward(self, x):
+        return self.linear(self.norm(x))
+
+
+def clean_text(text: str) -> str:
+    """Same normalisation as upstream training (preprocess.clean_text), minus emoji names."""
+    if "</think>" in text:
+        text = text.split("</think>")[1]
+    return re.sub(r"\s+", " ", text.lower()).strip()
 
 
 def sha256_file(path: Path) -> str:
@@ -78,6 +98,8 @@ class EditLensDetector(Detector):
         dtype = torch.float16 if device in ("cuda", "mps") else torch.float32
         model = AutoModelForSequenceClassification.from_pretrained(base, num_labels=num_labels, torch_dtype=dtype)
         model.config.pad_token_id = self.tokenizer.pad_token_id
+        if isinstance(getattr(model, "score", None), torch.nn.Linear):  # LoRA checkpoints train a normed head
+            model.score = NormedLinear(model.config.hidden_size, num_labels, dtype=dtype)
         self.model = PeftModel.from_pretrained(model, adapter_dir).to(device).eval()
         self.threshold = threshold  # recalibrate on the human corpus (run.py calibrate)
 
@@ -88,14 +110,17 @@ class EditLensDetector(Detector):
 
         with safe_open(str(path), "pt") as f:
             for key in f.keys():
+                if "score" in key and "linear.weight" in key:  # NormedLinear head
+                    return f.get_slice(key).get_shape()[0]
                 if key.endswith(("score.weight", "classifier.out_proj.weight", "score.modules_to_save.default.weight",
                                  "classifier.modules_to_save.default.out_proj.weight")):
                     return f.get_slice(key).get_shape()[0]
-        raise RuntimeError(f"Impossible de lire le nombre de classes de {path}")
+            keys = [k for k in f.keys() if "lora" not in k]
+        raise RuntimeError(f"Impossible de lire le nombre de classes de {path} (clés hors LoRA : {keys[:10]})")
 
     @torch.inference_mode()
     def detect(self, text: str) -> DetectionResult:
-        enc = self.tokenizer(text, return_tensors="pt", truncation=True, max_length=self.max_length)
+        enc = self.tokenizer(clean_text(text), return_tensors="pt", truncation=True, max_length=self.max_length)
         enc = {k: v.to(self.model.device) for k, v in enc.items()}
         probs = torch.softmax(self.model(**enc).logits[0].float(), -1)
         n = probs.numel()
