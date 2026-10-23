@@ -54,6 +54,9 @@ def apply_thresholds(detectors, calib: dict, lang: str) -> None:
             d.threshold = calib[lang][d.name]
 
 
+PAID = {"pangram"}  # API detectors: only called with --external / without --no-external
+
+
 def _split(detectors, cfg):
     external = set(cfg.get("external_detectors", ["pangram"]))
     local = [d for d in detectors if d.name not in external]
@@ -75,7 +78,7 @@ def _score(detectors, text) -> dict:
 def cmd_human(cfg, args):
     detectors = build_detectors(cfg)
     local, ext = _split(detectors, cfg)
-    use = local + (ext if args.external else [])
+    use = local + [d for d in ext if args.external or d.name not in PAID]
     out = Path(cfg["results_dir"]) / "human.jsonl"
     done = set()
     if out.exists():  # resumable: skip texts already scored
@@ -136,7 +139,7 @@ def cmd_generate(cfg, args):
 
     out = Path(cfg["results_dir"]) / "runs.jsonl"
     for brief in briefs:
-        apply_thresholds(local, calib, brief.language)
+        apply_thresholds(detectors, calib, brief.language)
         for cond in conditions:
             style_items = [(None, None)] if cond == "raw" else list(styles.items())
             for style_name, style in style_items:
@@ -154,7 +157,7 @@ def cmd_generate(cfg, args):
                         "draft": draft if cond == "style_revise" else None,
                         "revision": asdict(trace) if trace else None,
                         "metrics": style_metrics(text),
-                        "detectors": _score(local + (ext if not args.no_external else []), text),
+                        "detectors": _score(local + [d for d in ext if not args.no_external or d.name not in PAID], text),
                     }
                     if not args.no_judge:
                         from .quality import judge

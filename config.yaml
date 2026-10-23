@@ -36,8 +36,10 @@ detectors:
     enabled: false           # l'API demande un compte payant ; vérifier les textes finaux sur pangram.com
     daily_word_budget: 2000
 
-# Détecteurs appelés une seule fois en fin de génération (juges non vus par la boucle)
-external_detectors: [pangram]
+# Juges tenus à l'écart de la boucle de révision : notés une seule fois sur le texte final,
+# ils mesurent si ce qui trompe les détecteurs locaux trompe aussi un détecteur jamais vu.
+# --no-external ne coupe que les API payantes (pangram).
+external_detectors: [pangram, editlens]
 
 # Boucle de révision (condition style_revise)
 revision:
