@@ -5,6 +5,9 @@ import json
 from collections import defaultdict
 from pathlib import Path
 
+# Orientation of each local detector's raw score: sign * score grows with "AI-ness".
+SIGNS = {"binoculars": -1, "fast_detectgpt": 1, "editlens": 1}
+
 
 def _load(path: Path) -> list[dict]:
     if not path.exists():
@@ -30,9 +33,30 @@ def _fmt(x, pct=False):
     return f"{100 * x:.0f} %" if pct else f"{x:.2f}"
 
 
+def _rescore(recs: list[dict], calib: dict) -> None:
+    """Recompute flagged from the raw score with the calibrated per-language threshold.
+
+    Human texts are scored before calibration and generated ones after, so the stored
+    flags and p_ai do not share a scale; the raw score does. Also add `ai_score`
+    (sign * score) to rank texts for the AUROC.
+    """
+    for r in recs:
+        thresholds = calib.get(r.get("language", "fr"), {})
+        for d, v in r["detectors"].items():
+            if d not in SIGNS or "score" not in v:
+                continue
+            sign = SIGNS[d]
+            v["ai_score"] = sign * v["score"]
+            if d in thresholds:
+                v["flagged"] = v["ai_score"] > sign * thresholds[d]
+
+
 def build_report(results_dir: Path) -> Path:
     runs = _load(results_dir / "runs.jsonl")
     human = _load(results_dir / "human.jsonl")
+    calib_path = results_dir / "calibration.json"
+    calib = json.loads(calib_path.read_text()) if calib_path.exists() else {}
+    _rescore(runs + human, calib)
     detectors = sorted({d for r in runs + human for d, v in r["detectors"].items() if "p_ai" in v})
 
     groups = defaultdict(list)
@@ -45,7 +69,9 @@ def build_report(results_dir: Path) -> Path:
              f"{len(runs)} textes générés, {len(human)} textes humains.", "",
              "## Taux de signalement par détecteur", "",
              "Part des textes que chaque détecteur classe IA à son seuil. Sur la ligne « humain », "
-             "c'est le taux de faux positifs.", "",
+             "c'est le taux de faux positifs."
+             + (" Seuils calés par langue sur le corpus humain (results/calibration.json)." if calib else
+                " Seuils par défaut : lancer `calibrate` pour les caler sur le corpus humain."), "",
              "| " + " | ".join(["Langue", "Condition", "Style", "n", *detectors, "Faits", "Clarté", "Naturel"]) + " |",
              "|" + "---|" * (7 + len(detectors))]
     for (lang, cond, style), recs in sorted(groups.items()):
@@ -66,10 +92,11 @@ def build_report(results_dir: Path) -> Path:
         for lang, cond in sorted({(lang_of(r), r["condition"]) for r in runs}):
             cells = []
             for d in detectors:
-                pos = [r["detectors"][d]["p_ai"] for r in runs
-                       if lang_of(r) == lang and r["condition"] == cond and "p_ai" in r["detectors"].get(d, {})]
-                neg = [r["detectors"][d]["p_ai"] for r in human
-                       if lang_of(r) == lang and "p_ai" in r["detectors"].get(d, {})]
+                key = "ai_score" if d in SIGNS else "p_ai"
+                pos = [r["detectors"][d][key] for r in runs
+                       if lang_of(r) == lang and r["condition"] == cond and key in r["detectors"].get(d, {})]
+                neg = [r["detectors"][d][key] for r in human
+                       if lang_of(r) == lang and key in r["detectors"].get(d, {})]
                 cells.append(_fmt(_auroc(pos, neg)))
             lines.append(f"| {lang} | {cond} | " + " | ".join(cells) + " |")
 

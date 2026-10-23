@@ -20,6 +20,7 @@ from .briefs import load_briefs
 from .detectors import build_detectors
 from .detectors.stylometry import style_metrics
 from .llm import Claude
+from .report import SIGNS
 from .revise import revise
 from .styles import load_styles
 
@@ -101,7 +102,7 @@ def cmd_calibrate(cfg, args):
     calib: dict = {}
     for lang in sorted({r.get("language", "fr") for r in recs}):
         lang_recs = [r for r in recs if r.get("language", "fr") == lang]
-        for name, sign in (("binoculars", -1), ("fast_detectgpt", 1), ("editlens", 1)):
+        for name, sign in SIGNS.items():
             scores = [r["detectors"][name]["score"] for r in lang_recs
                       if "score" in r["detectors"].get(name, {})]
             if len(scores) < 10:

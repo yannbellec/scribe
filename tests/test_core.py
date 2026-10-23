@@ -189,3 +189,19 @@ def test_calibration_is_per_language(tmp_path):
     det = SimpleNamespace(name="fast_detectgpt", threshold=0)
     apply_thresholds([det], calib, "en")
     assert det.threshold == calib["en"]["fast_detectgpt"]
+
+
+def test_report_uses_calibrated_raw_scores(tmp_path):
+    # Human text scored with the default threshold (not flagged), generated text after
+    # calibration: the report must flag both against the same calibrated threshold.
+    bino = lambda s, flag: {"binoculars": {"p_ai": 0.5, "flagged": flag, "score": s, "threshold": 0.85}}
+    runs = [{"condition": "raw", "style": None, "language": "en", "detectors": bino(0.70, True)},
+            {"condition": "raw", "style": None, "language": "en", "detectors": bino(0.95, False)}]
+    human = [{"kind": "human", "language": "en", "detectors": bino(s, False)} for s in (0.80, 0.98, 1.00)]
+    (tmp_path / "runs.jsonl").write_text("\n".join(json.dumps(r) for r in runs))
+    (tmp_path / "human.jsonl").write_text("\n".join(json.dumps(r) for r in human))
+    (tmp_path / "calibration.json").write_text(json.dumps({"en": {"binoculars": 0.90}}))
+    md = build_report(tmp_path).read_text()
+    assert "| en | raw | — | 2 | 50 % |" in md        # 0.70 < 0.90 flagged, 0.95 not
+    assert "| en | humain | corpus | 3 | 33 % |" in md  # 0.80 now flagged
+    assert "| en | raw | 0.83 |" in md                 # AUROC on -score (5 wins / 6), not p_ai
